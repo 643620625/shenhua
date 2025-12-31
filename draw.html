@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<meta charset="utf-8">
+<title>抽奖 - 神话抽卡</title>
+<style>
+  body{background:#fff;font-family:sans-serif;text-align:center;padding:20px}
+  button{padding:8px 16px;font-size:16px;margin:6px;cursor:pointer}
+  
+  /* 当前抽中卡片样式 */
+  .current-card{
+    margin: 30px auto;
+    width: 180px;
+    height: 240px;
+    border: 3px solid #000;
+    border-radius: 10px;
+    font-size: 20px;
+    font-weight: bold;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+  }
+  .current-card .hp{
+    font-size: 16px;
+    margin-top: 15px;
+    color: #333;
+  }
+  .current-card .rank{
+    font-size: 14px;
+    margin-top: 10px;
+    color: #666;
+  }
+  
+  /* 颜色样式 */
+  .white{background:#eee;color:#000}
+  .green{background:#2e7d32;color:#fff}
+  .blue{background:#1565c0;color:#fff}
+  .gold{background:#ffd900bd;color:#fff}
+  .orange{background:#ef6c00;color:#fff}
+  .red{background:#c62828;color:#fff}
+</style>
+
+<h2>抽奖</h2>
+<script src="common.js"></script>
+
+<button onclick="draw()">抽一次</button>
+<button onclick="location.href='index.html'">返回首页</button>
+
+<div id="currentCard" class="current-card">
+  <div>点击"抽一次"</div>
+  <div class="rank">开始抽卡</div>
+</div>
+
+<script>
+// 页面加载时读取存档
+if (localStorage.getItem("myth_save")) {
+  loadSilent();
+}
+
+// 品级名称映射
+const rankName = {
+  red:'红色·顶级',
+  orange:'橙色·圣人',
+  gold:'黄色·高阶',
+  blue:'蓝色·上仙',
+  green:'绿色·地仙',
+  white:'白色·小神'
+};
+
+function getRandomCard() {
+  const r = Math.random() * 100;
+  let color;
+  
+  // 调整后的概率分布
+  if (r < 50) {
+    color = 'white';           // 50%
+  } else if (r < 80) {
+    color = 'green';           // 30%
+  } else if (r < 92) {
+    color = 'blue';            // 12%
+  } else if (r < 97) {
+    color = 'gold';            // 5% (黄色)
+  } else if (r < 99.4999) {
+    color = 'orange';          // 2.4999%
+  } else {
+    color = 'red';             // 0.0001% (万分之一)
+  }
+  
+  const list = pool.filter(c => getColor(c) === color);
+  return list[Math.floor(Math.random() * list.length)];
+}
+
+function draw() {
+  const card = getRandomCard();
+  const color = getColor(card);
+  
+  // 更新 countMap
+  G.countMap[card.name] = (G.countMap[card.name] || 0) + 1;
+  
+  // 更新 owned（去重）
+  if(!G.owned.includes(card.name)) {
+    G.owned.push(card.name);
+  }
+  
+  // 更新最近抽卡记录
+  G.lastDraw.push(card);
+  
+  // 立即保存
+  saveSilent();
+  
+  // 显示本次抽卡结果
+  const currentDiv = document.getElementById('currentCard');
+  currentDiv.className = 'current-card ' + color;
+  currentDiv.innerHTML = `
+    <div>${card.name}</div>
+    <div class="hp">HP ${card.hp}</div>
+    <div class="rank">${rankName[color]}</div>
+  `;
+}
+</script>

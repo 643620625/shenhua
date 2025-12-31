@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<meta charset="utf-8">
+<title>图鉴 - 神话抽卡</title>
+<style>
+  body{background:#fff;font-family:sans-serif;text-align:center;padding:20px}
+  button{padding:8px 16px;margin:6px}
+  .rank-row{margin:10px auto;padding:10px 0;border-bottom:1px dashed #ccc}
+  .rank-title{font-size:18px;font-weight:bold;margin-bottom:8px}
+  .card-grid{display:flex;flex-wrap:wrap;justify-content:center;gap:10px}
+  .card{position:relative;width:90px;height:120px;border:2px solid #000;border-radius:6px;
+        display:flex;flex-direction:column;align-items:center;justify-content:center;font-weight:bold;font-size:14px}
+  .card .hp{font-size:12px;margin-top:4px}
+  /* 颜色样式 - 背景都为白色，文字颜色不同 */
+  .white{background:#fff;color:#666;border-color:#ccc}
+  .green{background:#fff;color:#2e7d32;border-color:#2e7d32}
+  .blue{background:#fff;color:#1565c0;border-color:#1565c0}
+  .gold{background:#fff;color:#c87f00;border-color:#ffd900}
+  .orange{background:#fff;color:#ef6c00;border-color:#ef6c00}
+  .red{background:#fff;color:#c62828;border-color:#c62828}
+  .gray{background:#fff;color:#9e9e9e;border-color:#e0e0e0;border-style:dashed}
+  .empty-msg{color:#666;margin:40px 0;font-size:16px}
+</style>
+
+<button onclick="location.href='index.html'">返回首页</button>
+<button onclick="refreshGallery()">刷新图鉴</button>
+<h2>图鉴</h2>
+<div id="gallery"></div>
+
+<script src="common.js"></script>
+<script>
+  // 刷新图鉴
+  function refreshGallery() {
+    if (localStorage.getItem("myth_save")) {
+      loadSilent();
+    }
+    renderGallery();
+  }
+
+  const order = ['red','orange','gold','blue','green','white'];
+  const rankName = {
+    red:'红色·顶级',
+    orange:'橙色·圣人',
+    gold:'黄色·高阶',
+    blue:'蓝色·上仙',
+    green:'绿色·地仙',
+    white:'白色·小神'
+  };
+
+  function renderGallery(){
+    const box = document.getElementById('gallery');
+    box.innerHTML = '';
+    
+    // 计算收集进度
+    let totalCards = 0;
+    let collectedCards = 0;
+    
+    // 先统计总数
+    order.forEach(cl => {
+      totalCards += pool.filter(c => getColor(c) === cl).length;
+    });
+    
+    collectedCards = G.owned.length;
+    
+    // 显示统计数据
+    const stats = document.createElement('div');
+    stats.style.cssText = 'margin:10px 0;padding:5px;background:#f5f5f5;border-radius:4px;';
+    stats.innerHTML = `<strong>收集进度:</strong> ${collectedCards}/${totalCards} (${Math.round(collectedCards/totalCards*100)}%)`;
+    box.appendChild(stats);
+    
+    // 按品级渲染卡片
+    order.forEach(cl => {
+      // 获取该品级的所有卡片
+      const cardsInRank = pool.filter(c => getColor(c) === cl);
+      
+      if (cardsInRank.length > 0) {
+        const row = document.createElement('div');
+        row.className = 'rank-row';
+        
+        const ttl = document.createElement('div');
+        ttl.className = 'rank-title';
+        ttl.style.color = cl === 'white' ? '#666' : cl;
+        
+        // 计算该品级的收集进度
+        const collectedInRank = cardsInRank.filter(c => G.owned.includes(c.name)).length;
+        ttl.textContent = `${rankName[cl]} (${collectedInRank}/${cardsInRank.length})`;
+        row.appendChild(ttl);
+
+        const grid = document.createElement('div');
+        grid.className = 'card-grid';
+        
+        cardsInRank.forEach(c => {
+          const isOwned = G.owned.includes(c.name);
+          const card = document.createElement('div');
+          card.className = 'card ' + (isOwned ? cl : 'gray');
+          card.innerHTML = `
+            <div>${c.name}</div>
+            <div class="hp">HP ${c.hp}</div>
+          `;
+          grid.appendChild(card);
+        });
+        
+        row.appendChild(grid);
+        box.appendChild(row);
+      }
+    });
+  }
+  
+  // 页面加载时初始化
+  window.onload = function() {
+    // 加载存档
+    if (localStorage.getItem("myth_save")) {
+      loadSilent();
+    }
+    
+    // 渲染图鉴
+    renderGallery();
+    
+    // 添加事件监听，当从其他页面返回时刷新
+    window.addEventListener('focus', function() {
+      refreshGallery();
+    });
+  };
+</script>

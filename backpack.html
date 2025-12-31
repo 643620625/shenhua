@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<meta charset="utf-8">
+<title>背包 - 神话抽卡</title>
+<style>
+  body{background:#fff;font-family:sans-serif;text-align:center;padding:20px}
+  button{padding:8px 16px;margin:6px}
+  
+  /* 卡片网格样式 - 缩小版 */
+  .rank-row{margin:8px auto;padding:8px 0;border-bottom:1px dashed #ccc}
+  .rank-title{font-size:16px;font-weight:bold;margin-bottom:6px}
+  .card-grid{display:flex;flex-wrap:wrap;justify-content:center;gap:6px}
+  .card{position:relative;width:70px;height:95px;border:2px solid #000;border-radius:4px;
+        display:flex;flex-direction:column;align-items:center;justify-content:center;font-weight:bold;font-size:12px}
+  .card .hp{font-size:10px;margin-top:3px}
+  .card .count{position:absolute;right:2px;bottom:2px;background:#e53935;color:#fff;font-size:10px;
+               padding:1px 3px;border-radius:6px}
+  
+  /* 颜色样式 */
+  .white{background:#eee;color:#000}
+  .green{background:#2e7d32;color:#fff}
+  .blue{background:#1565c0;color:#fff}
+  .gold{background:#ffd900bd;color:#fff}
+  .orange{background:#ef6c00;color:#fff}
+  .red{background:#c62828;color:#fff}
+  
+  /* 统计信息 */
+  .stats{background:#f5f5f5;padding:10px;border-radius:5px;margin:10px auto;max-width:500px;font-size:14px}
+  .stats-row{display:flex;justify-content:space-around;margin-top:5px}
+  .stats-item{text-align:center}
+  .stats-number{font-size:16px;font-weight:bold}
+  
+  .empty-msg{color:#666;margin:40px 0;font-size:16px}
+</style>
+
+<button onclick="location.href='index.html'">返回首页</button>
+<button onclick="refreshBackpack()">刷新背包</button>
+<h2>背包</h2>
+
+<div id="stats" class="stats"></div>
+<div id="backpack"></div>
+
+<script src="common.js"></script>
+<script>
+  // 刷新背包
+  function refreshBackpack() {
+    if (localStorage.getItem("myth_save")) {
+      loadSilent();
+    }
+    renderBackpack();
+    updateStats();
+  }
+
+  const order = ['red','orange','gold','blue','green','white'];
+  const rankName = {
+    red:'红色·顶级',
+    orange:'橙色·圣人',
+    gold:'黄色·高阶',
+    blue:'蓝色·上仙',
+    green:'绿色·地仙',
+    white:'白色·小神'
+  };
+
+  // 更新统计数据
+  function updateStats() {
+    const statsDiv = document.getElementById('stats');
+    if (!statsDiv) return;
+    
+    let totalCards = 0;
+    let redCards = 0, orangeCards = 0, goldCards = 0;
+    let blueCards = 0, greenCards = 0, whiteCards = 0;
+    
+    for(let name in G.countMap) {
+      const count = G.countMap[name];
+      totalCards += count;
+      
+      const card = pool.find(c => c.name === name);
+      if (card) {
+        const color = getColor(card);
+        switch(color) {
+          case 'red': redCards += count; break;
+          case 'orange': orangeCards += count; break;
+          case 'gold': goldCards += count; break;
+          case 'blue': blueCards += count; break;
+          case 'green': greenCards += count; break;
+          case 'white': whiteCards += count; break;
+        }
+      }
+    }
+    
+    statsDiv.innerHTML = `
+      <div><strong>背包统计</strong></div>
+      <div class="stats-row">
+        <div class="stats-item">
+          <div class="stats-number" style="color:red">${redCards}</div>
+          <div style="font-size:12px;color:#666">红卡</div>
+        </div>
+        <div class="stats-item">
+          <div class="stats-number" style="color:orange">${orangeCards}</div>
+          <div style="font-size:12px;color:#666">橙卡</div>
+        </div>
+        <div class="stats-item">
+          <div class="stats-number" style="color:gold">${goldCards}</div>
+          <div style="font-size:12px;color:#666">黄卡</div>
+        </div>
+        <div class="stats-item">
+          <div class="stats-number" style="color:blue">${blueCards}</div>
+          <div style="font-size:12px;color:#666">蓝卡</div>
+        </div>
+        <div class="stats-item">
+          <div class="stats-number" style="color:green">${greenCards}</div>
+          <div style="font-size:12px;color:#666">绿卡</div>
+        </div>
+        <div class="stats-item">
+          <div class="stats-number" style="color:#666">${whiteCards}</div>
+          <div style="font-size:12px;color:#666">白卡</div>
+        </div>
+      </div>
+      <div style="margin-top:8px;border-top:1px solid #ddd;padding-top:8px">
+        总计: <strong>${totalCards}</strong> 张卡片 | 收集: <strong>${G.owned.length}</strong>/${pool.length} 种
+      </div>
+    `;
+  }
+
+  function renderBackpack(){
+    // 确保数据已加载
+    if (!G.countMap) {
+      G.countMap = {};
+    }
+    
+    const box = document.getElementById('backpack');
+    box.innerHTML = '';
+    
+    // 检查是否有卡片
+    let hasCards = false;
+    for(let name in G.countMap) {
+      if (G.countMap[name] > 0) {
+        hasCards = true;
+        break;
+      }
+    }
+    
+    if (!hasCards) {
+      box.innerHTML = '<p class="empty-msg">背包空空如也，快去抽卡吧！</p>';
+      return;
+    }
+    
+    // 按品级渲染卡片
+    let hasCardsInAnyRank = false;
+    
+    order.forEach(cl => {
+      // 获取该品级的所有卡片
+      const cardsInRank = pool.filter(c => getColor(c) === cl);
+      
+      // 筛选出已抽到的卡片
+      const ownedCards = cardsInRank.filter(c => {
+        const count = G.countMap[c.name] || 0;
+        return count > 0;
+      });
+      
+      // 如果有该品级的卡片
+      if (ownedCards.length > 0) {
+        hasCardsInAnyRank = true;
+        
+        const row = document.createElement('div');
+        row.className = 'rank-row';
+        
+        const ttl = document.createElement('div');
+        ttl.className = 'rank-title';
+        ttl.style.color = cl === 'white' ? '#666' : cl;
+        ttl.textContent = `${rankName[cl]} (${ownedCards.length}/${cardsInRank.length})`;
+        row.appendChild(ttl);
+
+        const grid = document.createElement('div');
+        grid.className = 'card-grid';
+        
+        // 按拥有数量排序
+        ownedCards.sort((a, b) => {
+          const countA = G.countMap[a.name] || 0;
+          const countB = G.countMap[b.name] || 0;
+          if (countB !== countA) return countB - countA;
+          return a.name.localeCompare(b.name);
+        });
+        
+        ownedCards.forEach(c => {
+          const count = G.countMap[c.name] || 0;
+          const card = document.createElement('div');
+          card.className = 'card ' + cl;
+          card.innerHTML = `
+            <div>${c.name}</div>
+            <div class="hp">HP ${c.hp}</div>
+            <span class="count">×${count}</span>
+          `;
+          grid.appendChild(card);
+        });
+        
+        row.appendChild(grid);
+        box.appendChild(row);
+      }
+    });
+    
+    if (!hasCardsInAnyRank) {
+      box.innerHTML = '<p class="empty-msg">数据异常，请尝试重置后重新抽卡</p>';
+    }
+  }
+  
+  // 页面加载时初始化
+  window.onload = function() {
+    // 加载存档
+    if (localStorage.getItem("myth_save")) {
+      loadSilent();
+    }
+    
+    // 更新统计和渲染
+    updateStats();
+    renderBackpack();
+    
+    // 添加事件监听，当从其他页面返回时刷新
+    window.addEventListener('focus', function() {
+      refreshBackpack();
+    });
+  };
+</script>
