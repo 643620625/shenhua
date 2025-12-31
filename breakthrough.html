@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<meta charset="utf-8">
+<title>突破 - 神话抽卡</title>
+<style>
+  body{background:#fff;font-family:sans-serif;text-align:center;padding:20px}
+  button{padding:8px 16px;margin:6px;cursor:pointer}
+  
+  /* 卡片网格样式 */
+  .card-grid{display:flex;flex-wrap:wrap;justify-content:center;gap:8px;margin:20px 0}
+  .card{position:relative;width:70px;height:95px;border:2px solid #000;border-radius:4px;
+        display:flex;flex-direction:column;align-items:center;justify-content:center;font-weight:bold;font-size:12px;
+        cursor:pointer}
+  .card .hp{font-size:10px;margin-top:3px}
+  .card .count{position:absolute;right:2px;bottom:2px;background:#e53935;color:#fff;font-size:10px;
+               padding:1px 3px;border-radius:6px}
+  .card .realm{position:absolute;left:2px;top:2px;background:rgba(0,0,0,0.7);color:#fff;font-size:10px;
+               padding:1px 3px;border-radius:3px}
+  
+  /* 颜色样式 */
+  .white{background:#eee;color:#000}
+  .green{background:#2e7d32;color:#fff}
+  .blue{background:#1565c0;color:#fff}
+  .gold{background:#ffd900bd;color:#fff}
+  .orange{background:#ef6c00;color:#fff}
+  .red{background:#c62828;color:#fff}
+  
+  .selected{box-shadow:0 0 0 3px #ff9800}
+  
+  /* 突破信息区域 */
+  .breakthrough-info{margin:20px;padding:20px;border:2px solid #4caf50;border-radius:10px;background:#f1f8e9}
+  .breakthrough-stage{font-size:24px;font-weight:bold;color:#2e7d32;margin:10px 0}
+  .breakthrough-hp{font-size:18px;margin:10px 0}
+  .breakthrough-cost{color:#666;font-size:14px;margin:10px 0}
+  .cost-item{margin:8px 0;padding:8px;background:#fff;border-radius:5px;border-left:4px solid #4caf50}
+  .cost-label{font-weight:bold;color:#333}
+  .cost-value{float:right;font-weight:bold;color:#e65100}
+  
+  .breakthrough-btn{background:#4caf50;color:white;font-size:18px;padding:12px 24px;margin:10px;
+                    border:none;border-radius:6px;cursor:pointer}
+  .breakthrough-btn:disabled{background:#ccc;cursor:not-allowed}
+</style>
+
+<button onclick="location.href='index.html'">返回首页</button>
+<button onclick="resetBreakthrough()">重置突破</button>
+<h2>突破系统</h2>
+
+<!-- 资源显示 -->
+<div style="margin:10px 0;padding:10px;background:#fff3cd;border-radius:5px;display:inline-block">
+  当前灵丹: <span id="currentLingdan" style="font-weight:bold;color:#e65100">0</span>
+</div>
+
+<div id="breakthroughInfo" class="breakthrough-info">
+  <p>点击选择要突破的卡牌</p>
+</div>
+
+<button id="breakthroughBtn" class="breakthrough-btn" onclick="doBreakthrough()" disabled>突破</button>
+
+<div id="cardList" class="card-grid"></div>
+
+<script src="common.js"></script>
+<script>
+// 选中的卡牌
+let selectedCard = null;
+
+// 更新灵丹显示
+function updateLingdanDisplay() {
+  document.getElementById('currentLingdan').textContent = RealmBattleSystem.resources.lingdan;
+}
+
+// 重置突破数据
+function resetBreakthrough() {
+  if (confirm('确定要重置所有突破数据吗？这将清空所有境界，但保留基础卡牌。')) {
+    BreakthroughSystem.resetAll();
+    alert('突破数据已重置！');
+    renderCardList();
+    updateLingdanDisplay();
+  }
+}
+
+// 获取卡牌显示信息
+function getCardDisplayInfo(cardInfo) {
+  const breakthroughInfo = BreakthroughSystem.getBreakthroughInfo(cardInfo.name);
+  const breakthroughDisplay = BreakthroughSystem.getBreakthroughDisplay(breakthroughInfo.level);
+  const currentHp = Math.floor(cardInfo.hp * breakthroughDisplay.hpMultiplier);
+  const nextHp = Math.floor(cardInfo.hp * BreakthroughSystem.getHPMultiplier(breakthroughInfo.level + 1));
+  const availableCards = G.countMap[cardInfo.name] || 0;
+  const requiredCards = BreakthroughSystem.getRequiredCards(breakthroughInfo.level);
+  const quality = getColor(cardInfo);
+  const requiredLingdan = BreakthroughSystem.getRequiredLingdan(breakthroughInfo.level, quality);
+  
+  return {
+    name: cardInfo.name,
+    color: quality,
+    baseHp: cardInfo.hp,
+    currentHp: currentHp,
+    nextHp: nextHp,
+    breakthroughLevel: breakthroughInfo.level,
+    breakthroughStage: breakthroughDisplay.stage,
+    breakthroughRealm: breakthroughDisplay.realm,
+    requiredCards: requiredCards,
+    availableCards: availableCards,
+    requiredLingdan: requiredLingdan,
+    quality: quality,
+    qualityMultiplier: BreakthroughSystem.qualityCoefficients[quality] || 1.0,
+    canBreakthrough: availableCards >= requiredCards && 
+                     RealmBattleSystem.resources.lingdan >= requiredLingdan && 
+                     breakthroughInfo.level < BreakthroughSystem.levels.length - 1
+  };
+}
+
+// 渲染可突破卡牌列表
+function renderCardList() {
+  const container = document.getElementById('cardList');
+  container.innerHTML = '';
+  
+  const breakthroughCards = [];
+  
+  for (const cardName in G.countMap) {
+    const cardInfo = pool.find(c => c.name === cardName);
+    if (cardInfo && G.countMap[cardName] > 0) {
+      const displayInfo = getCardDisplayInfo(cardInfo);
+      
+      if (displayInfo.canBreakthrough || displayInfo.breakthroughLevel > 0) {
+        breakthroughCards.push(displayInfo);
+      }
+    }
+  }
+  
+  if (breakthroughCards.length === 0) {
+    container.innerHTML = '<p style="color:#666;width:100%">还没有可以突破的卡牌，快去抽卡或收集灵丹吧！</p>';
+    return;
+  }
+  
+  // 按境界从高到低排序
+  breakthroughCards.sort((a, b) => {
+    if (b.breakthroughLevel !== a.breakthroughLevel) return b.breakthroughLevel - a.breakthroughLevel;
+    if (b.currentHp !== a.currentHp) return b.currentHp - a.currentHp;
+    return a.name.localeCompare(b.name);
+  });
+  
+  breakthroughCards.forEach(displayInfo => {
+    const cardDiv = document.createElement('div');
+    cardDiv.className = `card ${displayInfo.color}`;
+    cardDiv.dataset.name = displayInfo.name;
+    
+    if (selectedCard && selectedCard.name === displayInfo.name) {
+      cardDiv.classList.add('selected');
+    }
+    
+    cardDiv.innerHTML = `
+      ${displayInfo.breakthroughLevel > 0 ? `<div class="realm">${formatRealmDisplay(displayInfo.breakthroughStage)}</div>` : ''}
+      <div>${displayInfo.name}</div>
+      <div class="hp">${displayInfo.currentHp.toLocaleString()}</div>
+      <div class="count">×${displayInfo.availableCards}</div>
+    `;
+    
+    cardDiv.onclick = () => selectCard(displayInfo);
+    container.appendChild(cardDiv);
+  });
+}
+
+// 格式化境界显示：凡人·二重
+function formatRealmDisplay(stage) {
+  return stage.replace(/([^\d]+)(\d+重)/, '$1·$2');
+}
+
+// 选择卡牌
+function selectCard(displayInfo) {
+  selectedCard = {
+    name: displayInfo.name,
+    baseHp: displayInfo.baseHp,
+    breakthroughLevel: displayInfo.breakthroughLevel,
+    quality: displayInfo.quality
+  };
+  
+  updateBreakthroughInfo();
+  renderCardList();
+  updateBreakthroughButton();
+}
+
+// 更新突破信息显示
+function updateBreakthroughInfo() {
+  const infoDiv = document.getElementById('breakthroughInfo');
+  
+  if (!selectedCard) {
+    infoDiv.innerHTML = '<p>点击选择要突破的卡牌</p>';
+    return;
+  }
+  
+  const cardInfo = pool.find(c => c.name === selectedCard.name);
+  const displayInfo = getCardDisplayInfo(cardInfo);
+  
+  // 简化的显示，只显示必要信息
+  infoDiv.innerHTML = `
+    <div style="font-size:20px;font-weight:bold;margin-bottom:15px">${selectedCard.name}</div>
+    <div class="breakthrough-stage">${formatRealmDisplay(displayInfo.breakthroughStage)} → ${formatRealmDisplay(BreakthroughSystem.levels[displayInfo.breakthroughLevel + 1])}</div>
+    <div class="breakthrough-hp">
+      HP: ${displayInfo.currentHp.toLocaleString()} → <span style="color:#4caf50;font-weight:bold">${displayInfo.nextHp.toLocaleString()}</span>
+    </div>
+    <div class="breakthrough-cost">
+      <div class="cost-item">
+        <span class="cost-label">需要卡牌:</span>
+        <span class="cost-value">${displayInfo.requiredCards}张</span>
+      </div>
+      <div class="cost-item">
+        <span class="cost-label">需要灵丹:</span>
+        <span class="cost-value">${displayInfo.requiredLingdan}个</span>
+      </div>
+    </div>
+  `;
+}
+
+// 更新突破按钮状态
+function updateBreakthroughButton() {
+  const btn = document.getElementById('breakthroughBtn');
+  
+  if (!selectedCard) {
+    btn.disabled = true;
+    return;
+  }
+  
+  const cardInfo = pool.find(c => c.name === selectedCard.name);
+  const displayInfo = getCardDisplayInfo(cardInfo);
+  btn.disabled = !displayInfo.canBreakthrough;
+}
+
+// 执行突破（无弹窗）
+function doBreakthrough() {
+  if (!selectedCard) return;
+  
+  const result = BreakthroughSystem.breakthrough(selectedCard.name, selectedCard.baseHp, selectedCard.quality);
+  
+  if (result.success) {
+    // 突破成功后，只更新信息显示，不弹窗
+    selectedCard = null;
+    updateBreakthroughInfo();
+    updateLingdanDisplay();
+    renderCardList();
+    document.getElementById('breakthroughBtn').disabled = true;
+    
+    // 可以添加一个简单的视觉反馈
+    const btn = document.getElementById('breakthroughBtn');
+    btn.style.backgroundColor = '#2e7d32';
+    setTimeout(() => {
+      btn.style.backgroundColor = '#4caf50';
+    }, 500);
+  } else {
+    // 失败时仍然显示提示
+    alert(result.message);
+  }
+}
+
+// 页面加载
+window.onload = function() {
+  if (localStorage.getItem("myth_save")) {
+    loadSilent();
+  }
+  BreakthroughSystem.init();
+  RealmBattleSystem.init();
+  updateLingdanDisplay();
+  renderCardList();
+};
+</script>

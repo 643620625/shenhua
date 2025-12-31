@@ -6,14 +6,14 @@
   button{padding:8px 16px;margin:6px}
   
   /* 卡片网格样式 - 缩小版 */
-  .rank-row{margin:8px auto;padding:8px 0;border-bottom:1px dashed #ccc}
-  .rank-title{font-size:16px;font-weight:bold;margin-bottom:6px}
-  .card-grid{display:flex;flex-wrap:wrap;justify-content:center;gap:6px}
+  .card-grid{display:flex;flex-wrap:wrap;justify-content:center;gap:8px;margin-top:15px}
   .card{position:relative;width:70px;height:95px;border:2px solid #000;border-radius:4px;
         display:flex;flex-direction:column;align-items:center;justify-content:center;font-weight:bold;font-size:12px}
-  .card .hp{font-size:10px;margin-top:3px}
+  .card .hp{font-size:10px;margin-top:3px;color:#333}
   .card .count{position:absolute;right:2px;bottom:2px;background:#e53935;color:#fff;font-size:10px;
                padding:1px 3px;border-radius:6px}
+  .card .realm{position:absolute;left:2px;top:2px;background:rgba(0,0,0,0.7);color:#fff;font-size:9px;
+               padding:1px 3px;border-radius:3px}
   
   /* 颜色样式 */
   .white{background:#eee;color:#000}
@@ -23,200 +23,286 @@
   .orange{background:#ef6c00;color:#fff}
   .red{background:#c62828;color:#fff}
   
-  /* 统计信息 */
-  .stats{background:#f5f5f5;padding:10px;border-radius:5px;margin:10px auto;max-width:500px;font-size:14px}
-  .stats-row{display:flex;justify-content:space-around;margin-top:5px}
-  .stats-item{text-align:center}
-  .stats-number{font-size:16px;font-weight:bold}
+  /* 排序选项 */
+  .sort-options{margin:10px auto;padding:10px;background:#f5f5f5;border-radius:5px;max-width:500px}
+  .sort-btn{padding:5px 10px;margin:0 5px;background:#e0e0e0;border:none;border-radius:3px;cursor:pointer;font-size:12px}
+  .sort-btn.active{background:#4caf50;color:white}
+  
+  /* 上阵卡牌区域 */
+  .battle-section{margin:15px auto;padding:15px;background:#e8f5e9;border-radius:8px;max-width:600px}
+  .battle-cards{display:flex;flex-wrap:wrap;justify-content:center;gap:8px;margin:10px 0}
+  .battle-card{width:60px;height:80px;border:2px solid #4caf50;border-radius:4px;background:#fff;
+               display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:10px;
+               position:relative}
+  .battle-card .battle-realm{position:absolute;left:2px;top:2px;background:rgba(76, 175, 80, 0.9);color:#fff;font-size:8px;
+                            padding:1px 2px;border-radius:2px}
+  .battle-card .battle-name{font-weight:bold;font-size:9px}
+  .battle-card .battle-hp{font-size:8px;color:#666;margin-top:2px}
+  
+  .empty-slot{width:60px;height:80px;border:2px dashed #ccc;border-radius:4px;background:#f5f5f5;
+              display:flex;align-items:center;justify-content:center;color:#999;font-size:11px}
+  
+  /* 资源显示 */
+  .resources{display:flex;justify-content:center;gap:15px;margin:10px 0}
+  .resource-item{padding:5px 10px;background:#fff3cd;border-radius:4px;font-size:14px}
+  .resource-item .value{font-weight:bold;color:#e65100}
+  
+  /* 境界显示 */
+  .realm-info{margin:10px auto;padding:10px;background:#e3f2fd;border-radius:5px;max-width:500px;font-size:14px}
   
   .empty-msg{color:#666;margin:40px 0;font-size:16px}
 </style>
 
 <button onclick="location.href='index.html'">返回首页</button>
+<button onclick="location.href='battle.html'">去战斗</button>
+<button onclick="location.href='breakthrough.html'">去突破</button>
 <button onclick="refreshBackpack()">刷新背包</button>
 <h2>背包</h2>
 
-<div id="stats" class="stats"></div>
+<!-- 资源显示 -->
+<div class="resources">
+  <div class="resource-item">仙元: <span class="value" id="xianyuan">0</span></div>
+  <div class="resource-item">灵丹: <span class="value" id="lingdan">0</span></div>
+</div>
+
+<!-- 境界显示 -->
+<div class="realm-info">
+  当前境界: <span id="currentRealm" style="font-weight:bold">畜生道</span>
+</div>
+
+<!-- 上阵卡牌区域 -->
+<div class="battle-section">
+  <h3>上阵卡牌 (最多6张)</h3>
+  <div class="battle-cards" id="battleCards">
+    <!-- 动态生成 -->
+  </div>
+  <div style="margin-top:10px;color:#666;font-size:14px">
+    点击下方卡牌可上阵/下阵
+  </div>
+</div>
+
+<div class="sort-options">
+  排序方式:
+  <button class="sort-btn active" onclick="changeSort('hp')">按HP</button>
+  <button class="sort-btn" onclick="changeSort('color')">按颜色</button>
+  <button class="sort-btn" onclick="changeSort('breakthrough')">按境界</button>
+  <button class="sort-btn" onclick="changeSort('name')">按名称</button>
+</div>
+
 <div id="backpack"></div>
 
 <script src="common.js"></script>
 <script>
-  // 刷新背包
-  function refreshBackpack() {
-    if (localStorage.getItem("myth_save")) {
-      loadSilent();
-    }
-    renderBackpack();
-    updateStats();
+// 当前排序方式
+let currentSort = 'hp';
+const colorOrder = ['red','orange','gold','blue','green','white'];
+
+// 刷新所有数据
+function refreshBackpack() {
+  if (localStorage.getItem("myth_save")) {
+    loadSilent();
   }
+  BreakthroughSystem.init();
+  RealmBattleSystem.init();
+  updateResources();
+  updateRealmInfo();
+  renderBattleCards();
+  renderBackpack();
+}
 
-  const order = ['red','orange','gold','blue','green','white'];
-  const rankName = {
-    red:'红色·顶级',
-    orange:'橙色·圣人',
-    gold:'黄色·高阶',
-    blue:'蓝色·上仙',
-    green:'绿色·地仙',
-    white:'白色·小神'
-  };
+// 更新资源显示
+function updateResources() {
+  document.getElementById('xianyuan').textContent = RealmBattleSystem.resources.xianyuan;
+  document.getElementById('lingdan').textContent = RealmBattleSystem.resources.lingdan;
+}
 
-  // 更新统计数据
-  function updateStats() {
-    const statsDiv = document.getElementById('stats');
-    if (!statsDiv) return;
-    
-    let totalCards = 0;
-    let redCards = 0, orangeCards = 0, goldCards = 0;
-    let blueCards = 0, greenCards = 0, whiteCards = 0;
-    
-    for(let name in G.countMap) {
-      const count = G.countMap[name];
-      totalCards += count;
+// 更新境界显示
+function updateRealmInfo() {
+  const currentRealm = RealmBattleSystem.getCurrentRealmInfo();
+  document.getElementById('currentRealm').textContent = currentRealm.name;
+}
+
+// 渲染上阵卡牌
+function renderBattleCards() {
+  const container = document.getElementById('battleCards');
+  container.innerHTML = '';
+  
+  // 显示已上阵卡牌
+  RealmBattleSystem.battleCards.forEach(cardName => {
+    const card = pool.find(c => c.name === cardName);
+    if (card) {
+      const breakthroughInfo = BreakthroughSystem.getBreakthroughInfo(cardName);
+      const breakthroughDisplay = BreakthroughSystem.getBreakthroughDisplay(breakthroughInfo.level);
+      const currentHp = Math.floor(card.hp * breakthroughDisplay.hpMultiplier);
       
+      const cardDiv = document.createElement('div');
+      cardDiv.className = 'battle-card';
+      cardDiv.innerHTML = `
+        ${breakthroughInfo.level > 0 ? `<div class="battle-realm">${formatRealmDisplay(breakthroughDisplay.stage)}</div>` : ''}
+        <div class="battle-name">${card.name}</div>
+        <div class="battle-hp">${currentHp.toLocaleString()}</div>
+      `;
+      container.appendChild(cardDiv);
+    }
+  });
+  
+  // 显示空位
+  const emptySlots = 6 - RealmBattleSystem.battleCards.length;
+  for (let i = 0; i < emptySlots; i++) {
+    const emptyDiv = document.createElement('div');
+    emptyDiv.className = 'empty-slot';
+    emptyDiv.textContent = '空位';
+    container.appendChild(emptyDiv);
+  }
+}
+
+// 格式化境界显示：凡人·二重
+function formatRealmDisplay(stage) {
+  // 将"凡人二重"转换为"凡人·二重"
+  return stage.replace(/([^\d]+)(\d+重)/, '$1·$2');
+}
+
+// 切换排序方式
+function changeSort(sortType) {
+  currentSort = sortType;
+  document.querySelectorAll('.sort-btn').forEach(btn => {
+    btn.classList.remove('active');
+  });
+  event.target.classList.add('active');
+  renderBackpack();
+}
+
+// 获取卡牌完整信息
+function getCardFullInfo(cardName, baseHp, color) {
+  const breakthroughInfo = BreakthroughSystem.getBreakthroughInfo(cardName);
+  const breakthroughDisplay = BreakthroughSystem.getBreakthroughDisplay(breakthroughInfo.level);
+  const currentHp = Math.floor(baseHp * breakthroughDisplay.hpMultiplier);
+  const count = G.countMap[cardName] || 0;
+  const isInBattle = RealmBattleSystem.battleCards.includes(cardName);
+  
+  return {
+    name: cardName,
+    baseHp: baseHp,
+    color: color,
+    count: count,
+    breakthroughLevel: breakthroughInfo.level,
+    breakthroughStage: breakthroughDisplay.stage,
+    breakthroughRealm: breakthroughDisplay.realm,
+    currentHp: currentHp,
+    isInBattle: isInBattle
+  };
+}
+
+// 上阵/下阵卡牌
+function toggleBattleCard(cardName) {
+  if (RealmBattleSystem.battleCards.includes(cardName)) {
+    RealmBattleSystem.removeBattleCard(cardName);
+    renderBattleCards();
+    renderBackpack();
+  } else {
+    const result = RealmBattleSystem.addBattleCard(cardName);
+    if (result.success) {
+      renderBattleCards();
+      renderBackpack();
+    } else {
+      alert(result.message);
+    }
+  }
+}
+
+function renderBackpack() {
+  if (!G.countMap) G.countMap = {};
+  
+  const box = document.getElementById('backpack');
+  box.innerHTML = '';
+  
+  // 收集所有卡片信息
+  let allCards = [];
+  for(let name in G.countMap) {
+    const count = G.countMap[name];
+    if (count > 0) {
       const card = pool.find(c => c.name === name);
       if (card) {
-        const color = getColor(card);
-        switch(color) {
-          case 'red': redCards += count; break;
-          case 'orange': orangeCards += count; break;
-          case 'gold': goldCards += count; break;
-          case 'blue': blueCards += count; break;
-          case 'green': greenCards += count; break;
-          case 'white': whiteCards += count; break;
-        }
+        const cardInfo = getCardFullInfo(name, card.hp, getColor(card));
+        allCards.push(cardInfo);
       }
-    }
-    
-    statsDiv.innerHTML = `
-      <div><strong>背包统计</strong></div>
-      <div class="stats-row">
-        <div class="stats-item">
-          <div class="stats-number" style="color:red">${redCards}</div>
-          <div style="font-size:12px;color:#666">红卡</div>
-        </div>
-        <div class="stats-item">
-          <div class="stats-number" style="color:orange">${orangeCards}</div>
-          <div style="font-size:12px;color:#666">橙卡</div>
-        </div>
-        <div class="stats-item">
-          <div class="stats-number" style="color:gold">${goldCards}</div>
-          <div style="font-size:12px;color:#666">黄卡</div>
-        </div>
-        <div class="stats-item">
-          <div class="stats-number" style="color:blue">${blueCards}</div>
-          <div style="font-size:12px;color:#666">蓝卡</div>
-        </div>
-        <div class="stats-item">
-          <div class="stats-number" style="color:green">${greenCards}</div>
-          <div style="font-size:12px;color:#666">绿卡</div>
-        </div>
-        <div class="stats-item">
-          <div class="stats-number" style="color:#666">${whiteCards}</div>
-          <div style="font-size:12px;color:#666">白卡</div>
-        </div>
-      </div>
-      <div style="margin-top:8px;border-top:1px solid #ddd;padding-top:8px">
-        总计: <strong>${totalCards}</strong> 张卡片 | 收集: <strong>${G.owned.length}</strong>/${pool.length} 种
-      </div>
-    `;
-  }
-
-  function renderBackpack(){
-    // 确保数据已加载
-    if (!G.countMap) {
-      G.countMap = {};
-    }
-    
-    const box = document.getElementById('backpack');
-    box.innerHTML = '';
-    
-    // 检查是否有卡片
-    let hasCards = false;
-    for(let name in G.countMap) {
-      if (G.countMap[name] > 0) {
-        hasCards = true;
-        break;
-      }
-    }
-    
-    if (!hasCards) {
-      box.innerHTML = '<p class="empty-msg">背包空空如也，快去抽卡吧！</p>';
-      return;
-    }
-    
-    // 按品级渲染卡片
-    let hasCardsInAnyRank = false;
-    
-    order.forEach(cl => {
-      // 获取该品级的所有卡片
-      const cardsInRank = pool.filter(c => getColor(c) === cl);
-      
-      // 筛选出已抽到的卡片
-      const ownedCards = cardsInRank.filter(c => {
-        const count = G.countMap[c.name] || 0;
-        return count > 0;
-      });
-      
-      // 如果有该品级的卡片
-      if (ownedCards.length > 0) {
-        hasCardsInAnyRank = true;
-        
-        const row = document.createElement('div');
-        row.className = 'rank-row';
-        
-        const ttl = document.createElement('div');
-        ttl.className = 'rank-title';
-        ttl.style.color = cl === 'white' ? '#666' : cl;
-        ttl.textContent = `${rankName[cl]} (${ownedCards.length}/${cardsInRank.length})`;
-        row.appendChild(ttl);
-
-        const grid = document.createElement('div');
-        grid.className = 'card-grid';
-        
-        // 按拥有数量排序
-        ownedCards.sort((a, b) => {
-          const countA = G.countMap[a.name] || 0;
-          const countB = G.countMap[b.name] || 0;
-          if (countB !== countA) return countB - countA;
-          return a.name.localeCompare(b.name);
-        });
-        
-        ownedCards.forEach(c => {
-          const count = G.countMap[c.name] || 0;
-          const card = document.createElement('div');
-          card.className = 'card ' + cl;
-          card.innerHTML = `
-            <div>${c.name}</div>
-            <div class="hp">HP ${c.hp}</div>
-            <span class="count">×${count}</span>
-          `;
-          grid.appendChild(card);
-        });
-        
-        row.appendChild(grid);
-        box.appendChild(row);
-      }
-    });
-    
-    if (!hasCardsInAnyRank) {
-      box.innerHTML = '<p class="empty-msg">数据异常，请尝试重置后重新抽卡</p>';
     }
   }
   
-  // 页面加载时初始化
-  window.onload = function() {
-    // 加载存档
-    if (localStorage.getItem("myth_save")) {
-      loadSilent();
+  if (allCards.length === 0) {
+    box.innerHTML = '<p class="empty-msg">背包空空如也，快去抽卡吧！</p>';
+    return;
+  }
+  
+  // 排序
+  allCards.sort((a, b) => {
+    switch(currentSort) {
+      case 'hp':
+        if (b.currentHp !== a.currentHp) return b.currentHp - a.currentHp;
+        if (b.breakthroughLevel !== a.breakthroughLevel) return b.breakthroughLevel - a.breakthroughLevel;
+        return a.name.localeCompare(b.name);
+        
+      case 'color':
+        const orderA = colorOrder.indexOf(a.color);
+        const orderB = colorOrder.indexOf(b.color);
+        if (orderA !== orderB) return orderA - orderB;
+        if (b.currentHp !== a.currentHp) return b.currentHp - a.currentHp;
+        return a.name.localeCompare(b.name);
+        
+      case 'breakthrough':
+        if (b.breakthroughLevel !== a.breakthroughLevel) return b.breakthroughLevel - a.breakthroughLevel;
+        if (b.currentHp !== a.currentHp) return b.currentHp - a.currentHp;
+        return a.name.localeCompare(b.name);
+        
+      case 'name':
+        return a.name.localeCompare(b.name);
+        
+      default:
+        return a.name.localeCompare(b.name);
+    }
+  });
+  
+  // 创建卡片网格
+  const grid = document.createElement('div');
+  grid.className = 'card-grid';
+  
+  allCards.forEach(card => {
+    const cardDiv = document.createElement('div');
+    cardDiv.className = 'card ' + card.color;
+    if (card.isInBattle) {
+      cardDiv.style.borderColor = '#4caf50';
+      cardDiv.style.boxShadow = '0 0 5px #4caf50';
     }
     
-    // 更新统计和渲染
-    updateStats();
-    renderBackpack();
+    // 显示名称、HP，境界在左上角
+    cardDiv.innerHTML = `
+      ${card.breakthroughLevel > 0 ? `<div class="realm">${formatRealmDisplay(card.breakthroughStage)}</div>` : ''}
+      <div>${card.name}</div>
+      <div class="hp">HP ${card.currentHp.toLocaleString()}</div>
+      <span class="count">×${card.count}</span>
+    `;
     
-    // 添加事件监听，当从其他页面返回时刷新
-    window.addEventListener('focus', function() {
-      refreshBackpack();
-    });
-  };
+    // 点击上阵/下阵
+    cardDiv.onclick = () => toggleBattleCard(card.name);
+    
+    grid.appendChild(cardDiv);
+  });
+  
+  box.appendChild(grid);
+}
+
+// 页面加载
+window.onload = function() {
+  if (localStorage.getItem("myth_save")) {
+    loadSilent();
+  }
+  BreakthroughSystem.init();
+  RealmBattleSystem.init();
+  updateResources();
+  updateRealmInfo();
+  renderBattleCards();
+  renderBackpack();
+  
+  window.addEventListener('focus', refreshBackpack);
+};
 </script>

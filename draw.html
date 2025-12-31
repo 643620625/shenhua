@@ -5,11 +5,23 @@
   body{background:#fff;font-family:sans-serif;text-align:center;padding:20px}
   button{padding:8px 16px;font-size:16px;margin:6px;cursor:pointer}
   
+  /* 仙缘显示 */
+  .xianyuan-display {
+    font-size: 18px;
+    font-weight: bold;
+    color: #e65100;
+    background: #fff3cd;
+    padding: 8px 16px;
+    border-radius: 8px;
+    display: inline-block;
+    margin: 10px 0;
+  }
+  
   /* 当前抽中卡片样式 */
   .current-card{
-    margin: 30px auto;
-    width: 180px;
-    height: 240px;
+    margin: 20px auto;
+    width: 160px;
+    height: 220px;
     border: 3px solid #000;
     border-radius: 10px;
     font-size: 20px;
@@ -42,7 +54,12 @@
 <h2>抽奖</h2>
 <script src="common.js"></script>
 
-<button onclick="draw()">抽一次</button>
+<!-- 仙缘显示 -->
+<div class="xianyuan-display">
+  仙缘: <span id="xianyuanDisplay">0</span>
+</div>
+
+<button onclick="draw()" id="drawBtn">抽一次 (消耗10仙缘)</button>
 <button onclick="location.href='index.html'">返回首页</button>
 
 <div id="currentCard" class="current-card">
@@ -51,9 +68,39 @@
 </div>
 
 <script>
-// 页面加载时读取存档
-if (localStorage.getItem("myth_save")) {
-  loadSilent();
+// 页面加载时初始化
+window.onload = function() {
+  // 加载存档
+  if (localStorage.getItem("myth_save")) {
+    loadSilent();
+  }
+  // 初始化系统
+  BreakthroughSystem.init();
+  RealmBattleSystem.init();
+  // 更新仙缘显示
+  updateXianyuanDisplay();
+  // 更新按钮状态
+  updateDrawButton();
+};
+
+// 更新仙缘显示
+function updateXianyuanDisplay() {
+  document.getElementById('xianyuanDisplay').textContent = RealmBattleSystem.resources.xianyuan;
+}
+
+// 更新抽卡按钮状态
+function updateDrawButton() {
+  const drawBtn = document.getElementById('drawBtn');
+  const hasEnoughXianyuan = RealmBattleSystem.resources.xianyuan >= 10;
+  
+  drawBtn.disabled = !hasEnoughXianyuan;
+  if (!hasEnoughXianyuan) {
+    drawBtn.style.opacity = '0.6';
+    drawBtn.style.cursor = 'not-allowed';
+  } else {
+    drawBtn.style.opacity = '1';
+    drawBtn.style.cursor = 'pointer';
+  }
 }
 
 // 品级名称映射
@@ -90,6 +137,16 @@ function getRandomCard() {
 }
 
 function draw() {
+  // 检查仙缘是否足够
+  if (RealmBattleSystem.resources.xianyuan < 10) {
+    alert('仙缘不足！');
+    return;
+  }
+  
+  // 消耗10仙缘
+  RealmBattleSystem.resources.xianyuan -= 10;
+  RealmBattleSystem.save();
+  
   const card = getRandomCard();
   const color = getColor(card);
   
@@ -104,7 +161,7 @@ function draw() {
   // 更新最近抽卡记录
   G.lastDraw.push(card);
   
-  // 立即保存
+  // 保存所有数据
   saveSilent();
   
   // 显示本次抽卡结果
@@ -115,5 +172,15 @@ function draw() {
     <div class="hp">HP ${card.hp}</div>
     <div class="rank">${rankName[color]}</div>
   `;
+  
+  // 更新仙缘显示和按钮状态
+  updateXianyuanDisplay();
+  updateDrawButton();
+  
+  // 显示消耗提示
+  const costMsg = document.createElement('div');
+  costMsg.style.cssText = 'margin-top:10px;color:#666;font-size:12px;';
+  costMsg.textContent = '消耗10仙缘';
+  currentDiv.appendChild(costMsg);
 }
 </script>

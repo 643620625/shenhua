@@ -4,10 +4,63 @@
 <style>
   body{background:#fff;font-family:sans-serif;text-align:center;padding:40px}
   button{font-size:20px;padding:10px 20px;margin:10px}
+  .status{margin:20px auto;padding:15px;background:#f5f5f5;border-radius:10px;max-width:500px}
 </style>
 <h1>神话抽卡</h1>
+
+<div class="status" id="statusInfo">
+  正在加载数据...
+</div>
+
 <button onclick="location.href='draw.html'">去抽卡</button>
 <button onclick="location.href='gallery.html'">去图鉴</button>
 <button onclick="location.href='backpack.html'">去背包</button>
+<button onclick="location.href='battle.html'">去战斗</button>
+<button onclick="location.href='breakthrough.html'">去突破</button>
 <button onclick="reset()">重置</button>
+
 <script src="common.js"></script>
+<script>
+// 更新状态信息
+function updateStatus() {
+  const statusDiv = document.getElementById('statusInfo');
+  
+  let totalCards = 0;
+  for(let name in G.countMap) {
+    totalCards += G.countMap[name];
+  }
+  
+  // 计算平均突破等级
+  let totalLevel = 0;
+  let cardCount = 0;
+  for (const cardName in G.countMap) {
+    const breakthroughInfo = BreakthroughSystem.getBreakthroughInfo(cardName);
+    totalLevel += breakthroughInfo.level;
+    cardCount++;
+  }
+  const avgLevel = cardCount > 0 ? totalLevel / cardCount : 0;
+  const avgDisplay = BreakthroughSystem.getBreakthroughDisplay(Math.floor(avgLevel));
+  
+  // 获取当前境界
+  const currentRealm = RealmBattleSystem.getCurrentRealmInfo();
+  
+  statusDiv.innerHTML = `
+    <h3>当前状态</h3>
+    <p>卡牌总数: ${totalCards} 张</p>
+    <p>收集进度: ${G.owned.length}/${pool.length} 种</p>
+    <p>平均境界: ${avgDisplay.stage}</p>
+    <p>当前境界: ${currentRealm.name}</p>
+    <p>仙元: ${RealmBattleSystem.resources.xianyuan} | 灵丹: ${RealmBattleSystem.resources.lingdan}</p>
+  `;
+}
+
+// 页面加载
+window.onload = function() {
+  if (localStorage.getItem("myth_save")) {
+    loadSilent();
+  }
+  BreakthroughSystem.init();
+  RealmBattleSystem.init();
+  updateStatus();
+};
+</script>
